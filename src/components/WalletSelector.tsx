@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Wallet, ShieldCheck, ChevronRight } from 'lucide-react';
-import { useStore, EIP6963ProviderDetail } from '@/store/useStore';
+import { useStore, EIP6963ProviderInfo } from '@/store/useStore';
 import { bridge } from '@/lib/contracts';
 
 interface WalletSelectorProps {

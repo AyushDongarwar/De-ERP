@@ -7,7 +7,7 @@ import { Save, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function AdminPanelClient({ config }: { config: any }) {
-  const { role } = useStore();
+  const { user } = useStore();
   const [formData, setFormData] = useState({
     totalFunds: config.totalFunds,
     profitFromBot: config.profitFromBot,
@@ -17,7 +17,7 @@ export default function AdminPanelClient({ config }: { config: any }) {
   });
   const [isSaving, setIsSaving] = useState(false);
 
-  if (role !== 'ADMIN') {
+  if (user?.role !== 'SUPER_ADMIN' && user?.role !== 'ORGANIZATION') {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center">
         <AlertCircle size={48} className="text-destructive mb-4" />

@@ -38,7 +38,7 @@ export default function ExchangeClient() {
   }, [user?.id, isOrg, updateBalances, walletAddress]);
 
   const adminWithdrawn = transactions.filter(t => t.type === 'WITHDRAWAL').reduce((acc, t) => acc + t.amount, 0);
-  const availableBalance = role === 'ADMIN' ? Math.max(0, 37500 - adminWithdrawn) : (coldWalletBalance + Number(onChainWages));
+  const availableBalance = role === 'SUPER_ADMIN' ? Math.max(0, 37500 - adminWithdrawn) : (coldWalletBalance + Number(onChainWages));
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();

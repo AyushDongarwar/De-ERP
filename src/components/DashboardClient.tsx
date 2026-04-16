@@ -6,7 +6,7 @@ import { EarningChart } from "./Charts";
 import { motion } from "framer-motion";
 
 export default function DashboardClient({ config }: { config: any }) {
-  const { role, accumulatedPayroll } = useStore();
+  const { user, accumulatedPayroll } = useStore();
 
   const mockChartData = [
     { name: 'Mon', savings: 1200 },
@@ -52,11 +52,11 @@ export default function DashboardClient({ config }: { config: any }) {
               <TrendingUp size={18} />
             </div>
             <span className="text-sm font-medium">
-              {role === 'ADMIN' ? 'External Bot Profit' : 'Your Live Payroll'}
+              {user?.role === 'SUPER_ADMIN' ? 'External Bot Profit' : 'Your Live Payroll'}
             </span>
           </div>
           <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-indigo-400">
-            ${role === 'ADMIN' ? config.profitFromBot.toLocaleString() : accumulatedPayroll.toFixed(4)}
+            ${user?.role === 'SUPER_ADMIN' ? config.profitFromBot.toLocaleString() : accumulatedPayroll.toFixed(4)}
           </h3>
           <p className="text-xs text-muted-foreground mt-2">Streaming real-time</p>
         </motion.div>

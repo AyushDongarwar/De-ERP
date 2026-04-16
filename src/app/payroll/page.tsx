@@ -6,7 +6,7 @@ import { Play, Pause, DollarSign, Activity } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function PayrollStreamPage() {
-  const { role, accumulatedPayroll, addPayroll } = useStore();
+  const { user, accumulatedPayroll, addPayroll } = useStore();
   const [isStreaming, setIsStreaming] = useState(false);
   const hourlyRate = 25.50;
   const perSecondRate = hourlyRate / 3600;
@@ -21,7 +21,7 @@ export default function PayrollStreamPage() {
     return () => clearInterval(interval);
   }, [isStreaming, addPayroll, perSecondRate]);
 
-  if (role !== 'EMPLOYEE') {
+  if (user?.role !== 'EMPLOYEE') {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center">
         <h2 className="text-xl font-bold">Access Denied</h2>
