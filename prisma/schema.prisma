@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String       @id @default(cuid())
+  email          String?      @unique
+  password       String?
+  role           String       @default("EMPLOYEE") // SUPER_ADMIN, ORGANIZATION, EMPLOYEE
+  
+  orgId          String?      
+  organization   User?        @relation("OrgEmployees", fields: [orgId], references: [id])
+  employees      User[]       @relation("OrgEmployees")
+  
+  // Settings for employees or orgs
+  payType        String       @default("HOURLY") // HOURLY, DAILY
+  hourlyRate     Float        @default(25.50)
+  dailyRate      Float        @default(200.00)
+  botPercentage  Float        @default(15) // % of earnings diverted
+  
+  // Advanced Financial Fields
+  lockinDays     Int          @default(15)
+  lastLockDate   DateTime?
+  coldWalletBalance Float      @default(0)
+  coldWalletRate Float        @default(0.15)
+  hotWalletRate  Float        @default(0.85)
+  lockedFunds    Float        @default(0)
+  releasedFunds  Float        @default(0)
+  totalBotReturns Float       @default(0)
+  
+  isActive       Boolean      @default(true)
+  
+  // Organization Configuration
+  vizTools       String       @default("[]") // JSON string of chosen tools
+  currencyFeeRev Float        @default(0)
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  tasksAsEmployee Task[]      @relation("AssignedTasks")
+  tasksAsOrg      Task[]      @relation("OrgTasks")
+  
+  warehouses     Warehouse[]
+  transactions   Transaction[]
+}
+
+model Warehouse {
+  id             String      @id @default(cuid())
+  name           String
+  location       String?
+  organizationId String
+  organization   User        @relation(fields: [organizationId], references: [id])
+  machineries    Machinery[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Machinery {
+  id             String    @id @default(cuid())
+  name           String
+  type           String?
+  efficiency     Float     @default(100)
+  deliveryScore  Float     @default(0)
+  warehouseId    String
+  warehouse      Warehouse @relation(fields: [warehouseId], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  
+  employeeId  String   // Employee receiving task
+  employee    User     @relation("AssignedTasks", fields: [employeeId], references: [id])
+  
+  orgId       String   // Organization creating task
+  organization User    @relation("OrgTasks", fields: [orgId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Transaction {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  amount    Float
+  type      String   // DEPOSIT, WITHDRAWAL, TRANSFER, LOGISTICS_PAY
+  status    String   @default("PENDING") // PENDING, COMPLETED, FAILED
+  recipient String?  // e.g. "Binance" or wallet address
+  metadata  String?  // JSON string for logistics details
+  createdAt DateTime @default(now())
+}
+
+model WalletSplit {
+  id             String   @id @default(cuid())
+  hotWalletRes   Float    // 85%
+  coldWalletRes  Float    // 15%
+  lockedUntil    DateTime?
+  unlockCycleActive Boolean @default(false)
+  updatedAt      DateTime @updatedAt
+}
+
+model AdminInput {
+  id            String   @id @default(cuid())
+  totalFunds    Float    @default(0)
+  profitFromBot Float    @default(0)
+  totalEmployees Int     @default(0)
+  totalMachines  Int     @default(0)
+  monthlyRevenue Float    @default(0)
+  mintedBUSD     Float    @default(0)
+  conversionFee  Float    @default(1.5)
+  botReturnPercentage Float @default(8.5)
+  totalBotAllocation  Float @default(0)
+  botActive           Boolean @default(true)
+  lastUpdated   DateTime @default(now())
+}
+
