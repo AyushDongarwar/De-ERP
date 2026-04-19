@@ -23,8 +23,15 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!mounted) return;
     const isPublicPage = pathname === '/' || pathname === '/login';
+    
+    // Redirect if trying to access private page without user
     if (!user && !isPublicPage) {
       router.push('/');
+    }
+
+    // Smart Redirect: If logged in and on landing page, go to dashboard
+    if (user && pathname === '/') {
+      router.push('/dashboard');
     }
   }, [user, pathname, router, mounted]);
 
@@ -34,7 +41,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   if (!user) {
     if (isPublicPage) {
-      return <main className="min-h-screen bg-background flex text-foreground">{children}</main>;
+      return <main className="min-h-screen bg-background text-foreground">{children}</main>;
     }
     return null;
   }
@@ -53,6 +60,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       return [
         { name: 'Platform Overview', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Protocol & Fees', href: '/protocol', icon: ShieldCheck },
+        { name: 'Admin Center', href: '/admin', icon: ShieldCheck },
         { name: 'Bot Ecosystem', href: '/bot', icon: Bot },
         { name: 'Revenue Ledger', href: '/revenue', icon: BarChart3 },
       ];

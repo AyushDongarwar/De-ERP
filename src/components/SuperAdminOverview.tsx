@@ -61,17 +61,19 @@ export default function SuperAdminOverview() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border p-6 rounded-2xl border-l-4 border-l-indigo-500">
           <div className="flex items-center gap-3 text-muted-foreground mb-3">
             <DollarSign size={18} />
-            <span className="text-xs font-bold uppercase tracking-widest">Global Value</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-indigo-100">Total Ecosystem Liquidity</span>
           </div>
           <h3 className="text-3xl font-black">${globalMode.totalPlatformFunds.toLocaleString()}</h3>
+          <p className="text-[10px] text-indigo-300/60 mt-2 font-medium">Realized balances + Protocol reserve</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card border border-border p-6 rounded-2xl border-l-4 border-l-cyan-500 relative overflow-hidden">
           <div className="flex items-center gap-3 text-muted-foreground mb-3">
             <TrendingUp size={18} />
-            <span className="text-xs font-bold uppercase tracking-widest">Bot Revenue</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-cyan-100">Simulated Monthly Yield</span>
           </div>
           <h3 className="text-3xl font-black text-cyan-400">${Math.floor(globalMode.totalNetworkBotProfit).toLocaleString()}</h3>
+          <p className="text-[10px] text-cyan-300/60 mt-2 font-medium">Projected network performance</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-card border border-border p-6 rounded-2xl border-l-4 border-l-orange-500">

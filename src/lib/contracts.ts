@@ -52,11 +52,16 @@ const PAYROLL_ABI = [
 export class BlockchainBridge {
   private provider: ethers.BrowserProvider | null = null;
   private signer: ethers.Signer | null = null;
+  private readonlyProvider: ethers.JsonRpcProvider;
 
   private providers: Map<string, any> = new Map();
   private selectedRdns: string | null = null;
 
   constructor() {
+    this.readonlyProvider = new ethers.JsonRpcProvider(
+      process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com"
+    );
+    
     if (typeof window !== "undefined") {
       window.addEventListener("eip6963:announceProvider", (event: any) => {
         this.providers.set(event.detail.info.rdns, event.detail.provider);
@@ -103,12 +108,16 @@ export class BlockchainBridge {
     }
 
     if (eth) {
-      let selectedProvider = eth;
-      if (eth.providers?.length > 0) {
-        selectedProvider = eth.providers.find((p: any) => p.isMetaMask) || eth.providers[0];
+      try {
+        let selectedProvider = eth;
+        if (eth.providers?.length > 0) {
+          selectedProvider = eth.providers.find((p: any) => p.isMetaMask) || eth.providers[0];
+        }
+        this.provider = new ethers.BrowserProvider(selectedProvider);
+        return this.provider;
+      } catch (e) {
+        console.error("Failed to initialize BrowserProvider:", e);
       }
-      this.provider = new ethers.BrowserProvider(selectedProvider);
-      return this.provider;
     }
 
     // If still nothing, check if any provider announced itself
@@ -161,7 +170,9 @@ export class BlockchainBridge {
   private async getSigner() {
     const provider = await this.getProvider();
     if (!provider) {
-      throw new Error("MetaMask or a compatible Web3 wallet was not found. Please install MetaMask to continue.");
+      const err = new Error("Web3 Wallet Not Found. Please ensure MetaMask or a compatible wallet extension is installed and active.");
+      (err as any).code = "WALLET_NOT_FOUND";
+      throw err;
     }
     
     try {
@@ -209,29 +220,39 @@ export class BlockchainBridge {
   }
 
   async getStablecoinBalance(address: string) {
-    const provider = await this.getProvider();
-    if (!provider) return "0.00";
-    
     try {
-      // Check network before call
-      const network = await provider.getNetwork();
-      if (network.chainId !== BigInt(11155111)) {
-        console.warn("getStablecoinBalance: Wrong network. Expected Sepolia.");
-        return "0.00";
+      let activeProvider: ethers.Provider = this.readonlyProvider;
+      
+      const browserProvider = await this.getProvider();
+      if (browserProvider) {
+        const network = await browserProvider.getNetwork().catch(() => null);
+        if (network && network.chainId === BigInt(11155111)) {
+          activeProvider = browserProvider;
+        }
       }
 
       if (!ethers.isAddress(STABLECOIN_ADDRESS)) throw new Error("Invalid Stablecoin address");
 
-      const contract = new ethers.Contract(STABLECOIN_ADDRESS, STABLECOIN_ABI, provider);
-      const balance = await contract.balanceOf(address);
+      const contract = new ethers.Contract(STABLECOIN_ADDRESS, STABLECOIN_ABI, activeProvider);
+      const balance = await contract.balanceOf(address).catch((err: any) => {
+        if (err.code === "CALL_EXCEPTION") {
+          // If contract doesn't exist on browser provider, try fallback
+          if (activeProvider !== this.readonlyProvider) {
+            const fallbackContract = new ethers.Contract(STABLECOIN_ADDRESS, STABLECOIN_ABI, this.readonlyProvider);
+            return fallbackContract.balanceOf(address);
+          }
+        }
+        throw err;
+      });
+
       return ethers.formatUnits(balance, 18);
     } catch (e: any) {
       if (e.code === "CALL_EXCEPTION") {
-        console.error("Contract call failed. Is the contract deployed on your current network? (Expected Sepolia)");
+        console.warn("Contract not found at address on current network. Verify Sepolia deployment.");
       } else if (e.code === -32002) {
-        console.warn("RPC is throttling. Using cached balance.");
+        console.warn("RPC throttling.");
       } else {
-        console.error("Read Error:", e);
+        console.error("Balance Read Error:", e.name, e.message);
       }
       return "0.00";
     }
@@ -277,15 +298,26 @@ export class BlockchainBridge {
   }
 
   async getUnclaimedWages(wallet: string) {
-    const provider = await this.getProvider();
-    if (!provider) return "0.00";
-    
     try {
-      const network = await provider.getNetwork();
-      if (network.chainId !== BigInt(11155111)) return "0.00";
+      let activeProvider: ethers.Provider = this.readonlyProvider;
+      
+      const browserProvider = await this.getProvider();
+      if (browserProvider) {
+        const network = await browserProvider.getNetwork().catch(() => null);
+        if (network && network.chainId === BigInt(11155111)) {
+          activeProvider = browserProvider;
+        }
+      }
 
-      const contract = new ethers.Contract(PAYROLL_ADDRESS, PAYROLL_ABI, provider);
-      const wages = await contract.getUnclaimedWages(wallet);
+      const contract = new ethers.Contract(PAYROLL_ADDRESS, PAYROLL_ABI, activeProvider);
+      const wages = await contract.getUnclaimedWages(wallet).catch((err: any) => {
+        if (err.code === "CALL_EXCEPTION" && activeProvider !== this.readonlyProvider) {
+          const fallbackContract = new ethers.Contract(PAYROLL_ADDRESS, PAYROLL_ABI, this.readonlyProvider);
+          return fallbackContract.getUnclaimedWages(wallet);
+        }
+        throw err;
+      });
+
       return ethers.formatUnits(wages, 18);
     } catch (e) {
       return "0.00";

@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
-import { getOrganizations, createOrganization, getSuperAdminAnalytics, getAdminConfig, updateProtocolSettings, updateUserStatus, getProtocolTransactions } from "@/app/actions";
-import { Plus, Building2, Mail, DollarSign, TrendingUp, Users, Activity, Trophy, Settings, Coins, Eye, EyeOff, LayoutDashboard, ArrowRightLeft, History } from "lucide-react";
+import { getOrganizations, createOrganization, getSuperAdminAnalytics, getAdminConfig, updateProtocolSettings, updateUserStatus, getProtocolTransactions, lendToOrganization, repayOrganizationalDebt, updateLendingInterestRate } from "@/app/actions";
+import { Plus, Building2, Mail, DollarSign, TrendingUp, Users, Activity, Trophy, Settings, Coins, Eye, EyeOff, LayoutDashboard, ArrowRightLeft, History, CreditCard, AlertCircle, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { OrgPerformanceChart } from "./Charts";
 
@@ -10,8 +9,14 @@ export default function SuperAdminDashboard() {
   const [config, setConfig] = useState<any>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview"); // overview, exchange
+  const [activeTab, setActiveTab] = useState("overview"); // overview, exchange, debt
   const [protocolHistory, setProtocolHistory] = useState<any[]>([]);
+  
+  // Debt Hub State
+  const [selectedOrgId, setSelectedOrgId] = useState("");
+  const [lendAmount, setLendAmount] = useState("");
+  const [repayAmount, setRepayAmount] = useState("");
+  const [interestRate, setInterestRate] = useState("");
 
   const handleToggleStatus = async (orgId: string, currentStatus: boolean) => {
     if (isProcessing) return;
@@ -47,6 +52,7 @@ export default function SuperAdminDashboard() {
     setConfig(adminConf);
     setProtocolHistory(history);
     if (!feePct) setFeePct(adminConf.conversionFee.toString());
+    if (!interestRate) setInterestRate(adminConf.lendingInterestRate?.toString() || "0");
   };
 
   useEffect(() => {
@@ -74,6 +80,32 @@ export default function SuperAdminDashboard() {
     setMintAmount("");
     await fetchAll();
     setIsUpdatingProtocol(false);
+  };
+
+  const handleLend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrgId || !lendAmount) return;
+    setIsProcessing(true);
+    await lendToOrganization(selectedOrgId, Number(lendAmount));
+    setLendAmount("");
+    setIsProcessing(false);
+  };
+
+  const handleRepay = async (orgId: string, amount: string) => {
+    if (!amount) return;
+    setIsProcessing(true);
+    await repayOrganizationalDebt(orgId, Number(amount));
+    setRepayAmount("");
+    await fetchAll();
+    setIsProcessing(false);
+  };
+
+  const handleUpdateInterest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProcessing(true);
+    await updateLendingInterestRate(Number(interestRate));
+    await fetchAll();
+    setIsProcessing(false);
   };
 
   if (!analytics) return <div className="p-8 text-muted-foreground animate-pulse">Loading Platform Matrix...</div>;
@@ -111,7 +143,13 @@ export default function SuperAdminDashboard() {
             onClick={() => setActiveTab("exchange")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "exchange" ? "bg-emerald-500 text-white shadow-lg" : "text-muted-foreground hover:text-foreground"}`}
           >
-            <ArrowRightLeft size={16} /> Exchange & Transfers
+            <ArrowRightLeft size={16} /> Exchange
+          </button>
+          <button 
+            onClick={() => setActiveTab("debt")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === "debt" ? "bg-orange-500 text-white shadow-lg" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <CreditCard size={16} /> Debt Hub
           </button>
         </div>
       </div>
@@ -340,6 +378,128 @@ export default function SuperAdminDashboard() {
                 </button>
               </form>
             </motion.div>
+          </motion.div>
+        ) : activeTab === "debt" ? (
+          <motion.div 
+            key="debt"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="space-y-6"
+          >
+            {/* DEBT MACROS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-card border-l-4 border-l-orange-500 border border-border p-6 rounded-2xl">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Total System Debt</p>
+                <h3 className="text-3xl font-black text-orange-400">
+                  ${orgStats.reduce((sum: number, o: any) => sum + (o.totalLentAmount || 0), 0).toLocaleString()}
+                </h3>
+                <p className="text-[10px] text-muted-foreground mt-2 italic">Principal amount owed to platform</p>
+              </div>
+              <div className="bg-card border-l-4 border-l-emerald-500 border border-border p-6 rounded-2xl">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Interest Generated</p>
+                <h3 className="text-3xl font-black text-emerald-400">
+                  ${orgStats.reduce((sum: number, o: any) => sum + (o.debtInterestPaid || 0), 0).toLocaleString()}
+                </h3>
+                <p className="text-[10px] text-muted-foreground mt-2 italic">Direct revenue from lending</p>
+              </div>
+              <div className="bg-card border-l-4 border-l-indigo-500 border border-border p-6 rounded-2xl">
+                <form onSubmit={handleUpdateInterest} className="space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center justify-between">
+                    Global Debt Interest <span>{config?.lendingInterestRate || 0}%</span>
+                  </p>
+                  <div className="flex gap-2">
+                    <input 
+                      type="number" value={interestRate} onChange={e => setInterestRate(e.target.value)}
+                      className="w-full bg-secondary/50 border border-border rounded-lg px-3 py-1 text-sm outline-none"
+                    />
+                    <button type="submit" className="bg-indigo-500 text-xs px-3 py-1 rounded-lg font-bold">SET</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* LENDING FORM */}
+              <div className="lg:col-span-1 space-y-6">
+                <div className="bg-card border border-border p-6 rounded-3xl">
+                  <h3 className="font-bold flex items-center gap-2 mb-6">
+                    <ArrowUpRight className="text-orange-400" /> New Liquidity Loan
+                  </h3>
+                  <form onSubmit={handleLend} className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">Select Organization</label>
+                      <select 
+                        value={selectedOrgId} onChange={e => setSelectedOrgId(e.target.value)}
+                        className="w-full bg-secondary border border-border rounded-xl px-4 py-2 text-sm outline-none"
+                      >
+                        <option value="">Choose Org...</option>
+                        {orgStats.map((o: any) => (
+                          <option key={o.id} value={o.id}>{o.email}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase">Loan Amount ($)</label>
+                      <input 
+                        type="number" value={lendAmount} onChange={e => setLendAmount(e.target.value)}
+                        placeholder="5000"
+                        className="w-full bg-secondary border border-border rounded-xl px-4 py-2 text-sm outline-none"
+                      />
+                    </div>
+                    <button type="submit" disabled={isProcessing} className="w-full bg-orange-500 hover:bg-orange-600 py-3 rounded-xl font-bold text-sm transition-all shadow-lg shadow-orange-500/20">
+                      Inject Liquidity
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* DEBTOR LIST */}
+              <div className="lg:col-span-2">
+                <div className="bg-card border border-border rounded-3xl p-6 h-full">
+                  <h3 className="font-bold flex items-center gap-2 mb-6">
+                    <AlertCircle className="text-red-400" /> Debt Portfolio Tracking
+                  </h3>
+                  <div className="overflow-auto max-h-[400px]">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-[10px] text-muted-foreground uppercase tracking-widest border-b border-border">
+                        <tr>
+                          <th className="px-4 py-3">Organization</th>
+                          <th className="px-4 py-3">Balance</th>
+                          <th className="px-4 py-3">Loan Owed</th>
+                          <th className="px-4 py-3 text-right">Repayment</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orgStats.map((o: any) => (
+                          <tr key={o.id} className="border-b border-border/50 hover:bg-secondary/10 transition-colors">
+                            <td className="px-4 py-4 font-bold">{o.email}</td>
+                            <td className={`px-4 py-4 font-mono font-bold ${o.coldWalletBalance < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                              ${(o.coldWalletBalance || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-4 font-mono text-orange-400 font-bold">
+                              ${(o.totalLentAmount || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                <input 
+                                  key={`r-${o.id}`}
+                                  type="number" placeholder="Repay..."
+                                  className="w-20 bg-secondary/50 border border-border rounded px-2 py-1 text-xs outline-none"
+                                  onBlur={(e) => handleRepay(o.id, e.target.value)}
+                                />
+                                <button className="p-1 hover:bg-emerald-500/20 rounded text-emerald-400">
+                                  <ArrowDownLeft size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
           </motion.div>
         ) : (
           <motion.div 

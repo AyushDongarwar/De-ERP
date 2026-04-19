@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { getEmployeesByOrg, createEmployee, getTasksForOrg, createTask, getWarehouses, createWarehouse, addMachinery, unlockEmployeeFunds, getAdminConfig, withdrawFromProtocol, updateEmployeeLockin, updateEmployeeStatus } from "@/app/actions";
 import { bridge } from "@/lib/contracts";
 import { useStore } from "@/store/useStore";
-import { Plus, Users, LayoutList, Bot, Box, Activity, Warehouse as WarehouseIcon, Truck, BarChart2, Wallet, Coins, ArrowUpRight, DollarSign, EyeOff, Eye, UserMinus } from "lucide-react";
+import { Plus, Users, LayoutList, Bot, Box, Activity, Warehouse as WarehouseIcon, Truck, BarChart2, Wallet, Coins, ArrowUpRight, DollarSign, EyeOff, Eye, UserMinus, ListTodo, Send, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import OrganizationSetup from "./OrganizationSetup";
 import { WalletSelector } from './WalletSelector';
@@ -11,7 +11,7 @@ export default function OrgDashboard({ user }: { user: any }) {
   const [employees, setEmployees] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState("workforce"); // workforce, warehouses, logistics, treasury
+  const [activeTab, setActiveTab] = useState("workforce"); // workforce, warehouses, logistics, treasury, tasks
   const [isSetupNeeded, setIsSetupNeeded] = useState(user.vizTools === "[]");
 
   // Logistics Form State
@@ -45,6 +45,11 @@ export default function OrgDashboard({ user }: { user: any }) {
   const [warehouseName, setWarehouseName] = useState("");
   const [warehouseLocation, setWarehouseLocation] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  
+  // Task Management State
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDesc, setTaskDesc] = useState("");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
   const [protocolConfig, setProtocolConfig] = useState<any>(null);
 
@@ -251,6 +256,22 @@ export default function OrgDashboard({ user }: { user: any }) {
       setIsProcessing(false);
     }
   };
+  
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEmployeeId || !taskTitle) return;
+    setIsProcessing(true);
+    try {
+      await createTask(user.id, selectedEmployeeId, taskTitle, taskDesc);
+      setTaskTitle(""); setTaskDesc(""); setSelectedEmployeeId("");
+      fetchData();
+      alert("Directive Dispatched successfully!");
+    } catch (err: any) {
+      alert("Failed to issue directive: " + err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   if (isSetupNeeded) {
     return <OrganizationSetup user={user} onComplete={() => { setIsSetupNeeded(false); fetchData(); }} />;
@@ -269,6 +290,7 @@ export default function OrgDashboard({ user }: { user: any }) {
         <div className="flex bg-secondary/50 p-1 rounded-xl border border-border overflow-x-auto max-w-full">
           {[
             { id: "workforce", label: "Workforce", icon: Users },
+            { id: "tasks", label: "Tasks", icon: ListTodo },
             { id: "warehouses", label: "Warehouses", icon: WarehouseIcon },
             { id: "logistics", label: "Logistics", icon: Truck },
             { id: "treasury", label: "Treasury", icon: Coins },
@@ -432,6 +454,128 @@ export default function OrgDashboard({ user }: { user: any }) {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+        {/* Tasks Tab */}
+        {activeTab === "tasks" && (
+          <motion.div 
+            key="tasks"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="grid lg:grid-cols-3 gap-6"
+          >
+            <div className="space-y-6">
+              <div className="bg-card border border-border p-6 rounded-3xl">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Send size={18} className="text-indigo-400" /> Directive Dispatch
+                </h3>
+                <form onSubmit={handleCreateTask} className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Recipient Node</label>
+                    <select 
+                      value={selectedEmployeeId} 
+                      onChange={e => setSelectedEmployeeId(e.target.value)} 
+                      required 
+                      className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="">Select Employee...</option>
+                      {employees.filter(e => e.isActive !== false).map(e => (
+                        <option key={e.id} value={e.id}>{e.email} ({e.payType})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Directive Title</label>
+                    <input 
+                      type="text" 
+                      value={taskTitle} 
+                      onChange={e => setTaskTitle(e.target.value)}
+                      placeholder="e.g. Optimize Pipeline Alpha" 
+                      className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Description / Parameters</label>
+                    <textarea 
+                      value={taskDesc} 
+                      onChange={e => setTaskDesc(e.target.value)}
+                      placeholder="Detailed instructions for the worker..." 
+                      rows={4}
+                      className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 resize-none"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    disabled={isProcessing || !selectedEmployeeId}
+                    className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
+                  >
+                    {isProcessing ? "Transmitting..." : "Dispatch Directive"}
+                  </button>
+                </form>
+              </div>
+
+              <div className="bg-indigo-500/5 border border-indigo-500/20 p-6 rounded-3xl">
+                <h4 className="text-xs font-bold text-indigo-400 mb-2 flex items-center gap-1">
+                  <Activity size={12} /> Command Protocol
+                </h4>
+                <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+                  "Directives are immutable once dispatched. Nodes are incentivized to resolve tasks to maintain their protocol reputation and ensure future lock-in eligibility."
+                </p>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2 bg-card border border-border p-6 rounded-3xl">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-bold flex items-center gap-2">
+                  <LayoutList size={18} className="text-muted-foreground" /> Organizational Task Queue
+                </h3>
+                <div className="flex gap-2 text-[10px] font-bold">
+                  <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-full border border-indigo-500/20">
+                    {tasks.filter(t => t.status === 'PENDING').length} PENDING
+                  </span>
+                  <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">
+                    {tasks.filter(t => t.status === 'COMPLETED').length} RESOLVED
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-4 max-h-[600px] overflow-auto pr-2 custom-scrollbar">
+                {tasks.map(t => (
+                  <div key={t.id} className="group relative bg-background/50 border border-border p-4 rounded-2xl hover:border-indigo-500/30 transition-all">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm">{t.title}</h4>
+                          {t.status === 'COMPLETED' ? (
+                            <span className="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Resolved</span>
+                          ) : (
+                            <span className="text-[9px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Transmitted</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{t.description}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] font-bold text-indigo-400">{t.employee?.email.split('@')[0]}</div>
+                        <div className="text-[9px] text-muted-foreground mt-1">{new Date(t.createdAt).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                    {t.status === 'COMPLETED' && (
+                      <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between">
+                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                            <CheckCircle2 size={12} /> Milestone Verified
+                         </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {tasks.length === 0 && (
+                  <div className="text-center py-20 bg-secondary/10 rounded-3xl border border-dashed border-border">
+                    <p className="text-sm text-muted-foreground italic">No directives found in the organizational queue.</p>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -708,8 +852,8 @@ export default function OrgDashboard({ user }: { user: any }) {
                 
                 <button 
                   type="submit"
-                  disabled={isProcessing || !walletAddress}
-                  className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-500/50 text-white font-bold py-3 rounded-xl transition-all shadow-[0_10px_20px_rgba(99,102,241,0.2)]"
+                  disabled={isProcessing}
+                  className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-[0_10px_20px_rgba(99,102,241,0.2)]"
                 >
                   {isProcessing ? "Processing..." : "Complete B2B Transfer"}
                 </button>

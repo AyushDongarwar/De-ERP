@@ -28,16 +28,31 @@ export default function EmployeeDashboard({ user }: { user: any }) {
     setROI 
   } = useStore();
 
-  // Sync with Database Financials
+  // Sync with Database Financials & Persistence Recovery
   useEffect(() => {
     const syncDB = async () => {
       const data = await getCurrentUserFinancials(user.id);
       if (data) {
         updateBalances(data.coldWalletBalance, data.lockedFunds);
+        
+        // RECOVERY: Calculate accrued earnings since last anchor
+        if (data.lastLockDate) {
+          const lastAnchor = new Date(data.lastLockDate).getTime();
+          const now = Date.now();
+          const secondsElapsed = Math.max(0, (now - lastAnchor) / 1000);
+          
+          // Calculate net rate per second
+          const botCut = user.botPercentage;
+          const rawRate = user.payType === 'HOURLY' ? user.hourlyRate : user.dailyRate / 8;
+          const netRatePerSec = (rawRate / 3600) * (1 - (botCut / 100));
+          
+          const persistedPayroll = secondsElapsed * netRatePerSec;
+          useStore.setState({ accumulatedPayroll: persistedPayroll });
+        }
       }
     };
     syncDB();
-  }, [user.id, updateBalances]);
+  }, [user.id, updateBalances, user.botPercentage, user.payType, user.hourlyRate, user.dailyRate]);
   
   const botCut = user.botPercentage;
   const rawRate = user.payType === 'HOURLY' ? user.hourlyRate : user.dailyRate / 8;

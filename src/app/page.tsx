@@ -94,19 +94,101 @@ export default function LandingPage() {
               <div className="w-3 h-3 rounded-full bg-green-500/80" />
               <div className="mx-auto bg-white/5 rounded pl-4 pr-12 text-xs text-white/30 h-6 flex items-center">app.de-erp.io / dashboard</div>
             </div>
-            {/* Fake dashboard inner */}
-            <div className="p-8 grid grid-cols-3 gap-6 opacity-60 pointer-events-none h-[400px]">
-               <div className="col-span-2 space-y-6">
-                 <div className="h-8 w-48 bg-white/5 rounded-lg" />
-                 <div className="grid grid-cols-2 gap-4">
-                   <div className="h-32 bg-indigo-500/10 border border-indigo-500/20 rounded-xl" />
-                   <div className="h-32 bg-white/5 border border-white/10 rounded-xl" />
+            {/* Fake dashboard inner - populated with 'Live' preview elements */}
+            <div className="p-0 flex flex-col h-[500px] bg-[#09090b]">
+               <div className="flex-1 flex overflow-hidden">
+                 {/* Sidebar Mock */}
+                 <div className="w-48 border-r border-white/5 p-4 space-y-4">
+                   <div className="h-4 w-24 bg-white/10 rounded" />
+                   <div className="space-y-2 pt-4">
+                     {[1,2,3,4].map(i => (
+                       <div key={i} className={`h-8 rounded-lg flex items-center px-3 gap-2 ${i === 1 ? 'bg-indigo-500/10 text-indigo-400' : 'bg-transparent text-white/20'}`}>
+                         <div className="w-3 h-3 rounded bg-current opacity-30" />
+                         <div className="h-2 w-12 bg-current opacity-20" />
+                       </div>
+                     ))}
+                   </div>
                  </div>
-                 <div className="h-48 bg-white/5 border border-white/10 rounded-xl" />
-               </div>
-               <div className="space-y-6">
-                 <div className="h-64 bg-white/5 border border-white/10 rounded-xl" />
-                 <div className="h-full bg-gradient-to-t from-cyan-500/10 to-transparent border border-cyan-500/20 rounded-xl" />
+                 
+                 {/* Content Mock */}
+                 <div className="flex-1 p-6 space-y-6 overflow-hidden">
+                   <div className="flex justify-between items-center">
+                     <div className="space-y-1">
+                       <h4 className="text-sm font-bold text-white/90">Global Fleet Overview</h4>
+                       <p className="text-[10px] text-white/40 font-medium">REAL-TIME NETWORK DIAGNOSTICS</p>
+                     </div>
+                     <div className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/30 rounded-full text-[10px] font-bold text-indigo-400 flex items-center gap-2">
+                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                       SYSTEM OPERATIONAL
+                     </div>
+                   </div>
+
+                   <div className="grid grid-cols-3 gap-4">
+                     {[
+                       { label: 'Network Nodes', val: '1,248', color: 'indigo' },
+                       { label: 'Protocol Yield', val: '15.59%', color: 'cyan' },
+                       { label: 'Total Value', val: '$659.4M', color: 'purple' }
+                     ].map((stat, i) => (
+                       <div key={i} className="h-24 bg-white/[0.03] border border-white/5 rounded-xl p-4 flex flex-col justify-between">
+                         <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{stat.label}</div>
+                         <div className="text-xl font-bold text-white/90">{stat.val}</div>
+                         <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                           <div className={`h-full bg-${stat.color}-500 w-${i === 0 ? '4/5' : i === 1 ? '1/2' : '3/4'}`} />
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-4 h-full">
+                     <div className="bg-white/[0.03] border border-white/5 rounded-xl p-5 relative overflow-hidden">
+                        <div className="flex justify-between items-center mb-4">
+                           <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Live Yield Stream</div>
+                           <Zap size={14} className="text-indigo-400" />
+                        </div>
+                        <div className="space-y-3">
+                          {[
+                            { email: 'aaa@de-erp.io', amount: '+$14.20' },
+                            { email: 'bbb@de-erp.io', amount: '+$8.50' },
+                            { email: 'ccc@de-erp.io', amount: '+$21.00' }
+                          ].map((row, i) => (
+                            <div key={i} className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/40" />
+                                <div className="text-[10px] text-white/60 font-medium">{row.email}</div>
+                              </div>
+                              <div className="text-[10px] text-green-400 font-bold font-mono">{row.amount}</div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Fake mini chart lines */}
+                        <div className="absolute bottom-0 left-0 right-0 h-12 flex items-end px-4 gap-1 opacity-20 pointer-events-none">
+                          {[...Array(20)].map((_, i) => (
+                            <div key={i} className="flex-1 bg-indigo-400 rounded-t-sm" style={{ height: `${Math.sin(i * 0.5) * 40 + 50}%` }} />
+                          ))}
+                        </div>
+                     </div>
+                     <div className="bg-white/[0.03] border border-white/5 rounded-xl p-5">
+                        <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-4">Node Health Status</div>
+                        <div className="space-y-3">
+                          {[
+                            { name: 'EU-West Cluster', status: 'Online' },
+                            { name: 'US-East Relay', status: 'Syncing' },
+                            { name: 'Asia Gateway', status: 'Online' }
+                          ].map((node, i) => (
+                            <div key={i} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-0">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-1.5 h-1.5 rounded-full ${node.status === 'Online' ? 'bg-green-400' : 'bg-yellow-400'}`} />
+                                <div className="text-[10px] text-white/70 font-medium">{node.name}</div>
+                              </div>
+                              <div className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase ${node.status === 'Online' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                                {node.status}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                     </div>
+                   </div>
+                 </div>
                </div>
             </div>
           </div>

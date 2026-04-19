@@ -21,9 +21,9 @@ export function EarningChart({ data, width, height }: { data: any[], width?: str
       position: 'relative', 
       display: 'block' 
     }}>
-      {/* 99% width is a known workaround for ResponsiveContainer measurement jitter */}
+      {/* Increased left margin to prevent clipping of large currency values */}
       <ResponsiveContainer width="99%" height="100%" debounce={100}>
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 10, right: 10, left: 15, bottom: 0 }}>
           <defs>
             <linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
@@ -62,7 +62,7 @@ export function OrgPerformanceChart({ data, width, height }: { data: any[], widt
       display: 'block' 
     }}>
       <ResponsiveContainer width="99%" height="100%" debounce={100}>
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 10, right: 10, left: 15, bottom: 0 }}>
           <defs>
              <linearGradient id="colorBot" x1="0" y1="0" x2="0" y2="1">
                <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3}/>

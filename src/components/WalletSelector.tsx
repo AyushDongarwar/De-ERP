@@ -15,7 +15,9 @@ export const WalletSelector: React.FC<WalletSelectorProps> = ({ isOpen, onClose,
   const [isConnecting, setIsConnecting] = useState<string | null>(null);
 
   const scanForWallets = () => {
-    window.dispatchEvent(new Event("eip6963:requestProvider"));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("eip6963:requestProvider"));
+    }
   };
 
   useEffect(() => {
@@ -44,7 +46,12 @@ export const WalletSelector: React.FC<WalletSelectorProps> = ({ isOpen, onClose,
       onSelect(address);
       onClose();
     } catch (e: any) {
-      alert(e.message || "Connection failed");
+      console.error("Wallet connection error:", e);
+      if (e.code === "WALLET_NOT_FOUND") {
+        alert("Wallet extension not detected. Please ensure your browser extension (like MetaMask) is installed and unlocked.");
+      } else {
+        alert(e.message || "Connection failed. Please check your wallet extension.");
+      }
     } finally {
       setIsConnecting(null);
     }
