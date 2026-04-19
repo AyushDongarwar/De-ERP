@@ -115,18 +115,20 @@ export async function getOrgWorkforceFinancials(orgId: string) {
   // Fetch global loop config to sync the organization-wide timer
   const split = await prisma.walletSplit.findFirst();
 
-  // Use raw query for aggregation to ensure reliability
-  const results = await prisma.$queryRawUnsafe(
-    `SELECT SUM(coldWalletBalance) as cold, SUM(lockedFunds) as hot, SUM(releasedFunds) as released FROM User WHERE orgId = ? AND role = 'EMPLOYEE'`,
-    orgId
-  ) as any[];
-
-  const totals = results[0] || { cold: 0, hot: 0, released: 0 };
+  // Use Prisma Aggregate for cross-DB compatibility
+  const totals = await prisma.user.aggregate({
+    where: { orgId, role: "EMPLOYEE" },
+    _sum: {
+      coldWalletBalance: true,
+      lockedFunds: true,
+      releasedFunds: true
+    }
+  });
 
   return {
-    coldWalletBalance: Number(totals.cold || 0),
-    lockedFunds: Number(totals.hot || 0),
-    releasedFunds: Number(totals.released || 0),
+    coldWalletBalance: Number(totals._sum.coldWalletBalance || 0),
+    lockedFunds: Number(totals._sum.lockedFunds || 0),
+    releasedFunds: Number(totals._sum.releasedFunds || 0),
     lastLockDate: split?.updatedAt || null,
     lockinDays: 15,
     role: "ORGANIZATION",
@@ -135,15 +137,17 @@ export async function getOrgWorkforceFinancials(orgId: string) {
 }
 
 export async function getOrganizations() {
-  return prisma.$queryRawUnsafe(`SELECT * FROM "User" WHERE role = 'ORGANIZATION' ORDER BY createdAt DESC`) as Promise<any[]>;
+  return prisma.user.findMany({
+    where: { role: 'ORGANIZATION' },
+    orderBy: { createdAt: 'desc' }
+  });
 }
 
 export async function getEmployeesByOrg(orgId: string) {
-  // Use raw query to ensure we get 'isActive' even with a stale Prisma Client
-  return prisma.$queryRawUnsafe(
-    `SELECT * FROM User WHERE role = 'EMPLOYEE' AND orgId = ? ORDER BY createdAt DESC`,
-    orgId
-  ) as Promise<any[]>;
+  return prisma.user.findMany({
+    where: { role: 'EMPLOYEE', orgId },
+    orderBy: { createdAt: 'desc' }
+  });
 }
 
 export async function createOrganization(email: string, pass: string) {
@@ -219,8 +223,7 @@ export async function getTransactions(userId: string) {
 }
 
 export async function getAdminConfig() {
-  const configs = await prisma.$queryRawUnsafe(`SELECT * FROM AdminInput LIMIT 1`) as any[];
-  let config = configs[0];
+  const config = await prisma.adminInput.findFirst();
   
   // Real-time Aggregates
   const [userTotals, employeeCount] = await Promise.all([
@@ -338,7 +341,7 @@ export async function updateOrgVizTools(orgId: string, tools: string[]) {
 
 export async function getSuperAdminAnalytics() {
   const [orgs, config] = await Promise.all([
-    prisma.$queryRawUnsafe(`SELECT * FROM "User" WHERE role = 'ORGANIZATION'`) as Promise<any[]>,
+    prisma.user.findMany({ where: { role: 'ORGANIZATION' } }),
     getAdminConfig()
   ]);
 
@@ -436,16 +439,15 @@ export async function getSuperAdminAnalytics() {
 
 export async function updateBotConfig(percentage: number, isActive: boolean) {
   const config = await getAdminConfig();
-  const activeBit = isActive ? 1 : 0;
   
-  // Using Raw SQL to bypass stale Prisma Client validation
-  await prisma.$executeRawUnsafe(`
-    UPDATE AdminInput 
-    SET botReturnPercentage = ${percentage}, 
-        botActive = ${activeBit}, 
-        lastUpdated = DATETIME('now') 
-    WHERE id = '${config.id}'
-  `);
+  await prisma.adminInput.update({
+    where: { id: config.id },
+    data: {
+      botReturnPercentage: percentage,
+      botActive: isActive,
+      lastUpdated: new Date()
+    }
+  });
 
   revalidatePath('/bot');
   revalidatePath('/dashboard');
@@ -557,24 +559,28 @@ export async function updateEmployeeStatus(employeeId: string, isActive: boolean
 }
 
 export async function updateUserStatus(userId: string, isActive: boolean) {
-  // Using raw query to bypass stale Prisma Client validation (due to Windows file lock during generate)
-  await prisma.$executeRawUnsafe(
-    `UPDATE "User" SET isActive = ${isActive ? 1 : 0} WHERE id = ?`,
-    userId
-  );
+  await prisma.user.update({
+    where: { id: userId },
+    data: { isActive }
+  });
   revalidatePath('/admin');
   revalidatePath('/dashboard');
   return { success: true };
 }
 export async function getOrgWorkforceTransactions(orgId: string) {
-  return prisma.$queryRawUnsafe(
-    `SELECT t.*, u.email as employeeEmail 
-     FROM "Transaction" t 
-     JOIN "User" u ON t.userId = u.id 
-     WHERE u.orgId = ? AND u.role = 'EMPLOYEE' 
-     ORDER BY t.createdAt DESC`,
-    orgId
-  ) as Promise<any[]>;
+  return prisma.transaction.findMany({
+    where: {
+      type: 'LOGISTICS_PAY', // Or general type filtering as needed
+      user: {
+        orgId: orgId,
+        role: 'EMPLOYEE'
+      }
+    },
+    include: {
+      user: true // To get employee email and details
+    },
+    orderBy: { createdAt: 'desc' }
+  });
 }
 
 export async function processOrganizationalPayroll(orgId: string) {
@@ -609,10 +615,13 @@ export async function lendToOrganization(orgId: string, amount: number) {
       where: { id: config.id },
       data: { mintedBUSD: { decrement: amount } }
     }),
-    prisma.$executeRawUnsafe(
-      `UPDATE "User" SET coldWalletBalance = coldWalletBalance + ?, totalLentAmount = totalLentAmount + ? WHERE id = ?`,
-      amount, amount, orgId
-    )
+    prisma.user.update({
+      where: { id: orgId },
+      data: {
+        coldWalletBalance: { increment: amount },
+        totalLentAmount: { increment: amount }
+      }
+    })
   ]);
 
   revalidatePath('/dashboard');
@@ -641,14 +650,14 @@ export async function repayOrganizationalDebt(orgId: string, amount: number) {
         mintedBUSD: { increment: principalPortion }
       }
     }),
-    prisma.$executeRawUnsafe(
-      `UPDATE "User" 
-       SET coldWalletBalance = coldWalletBalance - ?, 
-           totalLentAmount = totalLentAmount - ?, 
-           debtInterestPaid = debtInterestPaid + ? 
-       WHERE id = ?`,
-      amount, principalPortion, interestPortion, orgId
-    )
+    prisma.user.update({
+      where: { id: orgId },
+      data: {
+        coldWalletBalance: { decrement: amount },
+        totalLentAmount: { decrement: principalPortion },
+        debtInterestPaid: { increment: interestPortion }
+      }
+    })
   ]);
 
   revalidatePath('/dashboard');
@@ -658,10 +667,10 @@ export async function repayOrganizationalDebt(orgId: string, amount: number) {
 
 export async function updateLendingInterestRate(rate: number) {
   const config = await getAdminConfig();
-  await prisma.$executeRawUnsafe(
-    `UPDATE AdminInput SET lendingInterestRate = ? WHERE id = ?`,
-    rate, config.id
-  );
+  await prisma.adminInput.update({
+    where: { id: config.id },
+    data: { lendingInterestRate: rate }
+  });
   revalidatePath('/dashboard');
   return { success: true };
 }
